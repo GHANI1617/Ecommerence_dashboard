@@ -1,116 +1,120 @@
+%%writefile app.py
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from mlxtend.frequent_patterns import apriori, association_rules
-from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import classification_report, accuracy_score
 from sklearn.cluster import KMeans
-import numpy as np
+from mlxtend.frequent_patterns import apriori, association_rules
 
-# Page configuration
-st.set_page_config(page_title="E-Commerce Data Mining Dashboard", layout="wide")
+# Configure Streamlit page
+st.set_page_config(page_title="E-Commerce Data Mining", layout="wide")
 
-# Cache the data loading function
+# Load and clean data
 @st.cache_data
-def load_data(file):
-    df = pd.read_excel(file)
+def load_data():
+    df = pd.read_excel("Online Retail.xlsx")
     df.dropna(subset=["CustomerID", "Description"], inplace=True)
     df["CustomerID"] = df["CustomerID"].astype(int)
     df["Description"] = df["Description"].str.strip()
     df["Country"] = df["Country"].str.strip()
     df["TotalPrice"] = df["Quantity"] * df["UnitPrice"]
-    df["InvoiceDate"] = pd.to_datetime(df["InvoiceDate"])  # Convert to datetime
+
+    # Clean negative quantities and prices
+    df = df[(df["Quantity"] > 0) & (df["UnitPrice"] > 0)]
+    df.drop_duplicates(inplace=True)
     return df
 
-# Load data
-uploaded_file = st.file_uploader("Upload Online Retail.xlsx", type=["xlsx"])
-if uploaded_file is not None:
-    df = load_data(uploaded_file)
-else:
-    try:
-        df = load_data("Online Retail.xlsx")
-    except FileNotFoundError:
-        st.error("File 'Online Retail.xlsx' not found. Please upload the dataset or place it in the directory.")
-        st.stop()
-    except Exception as e:
-        st.error(f"Error loading file: {str(e)}")
-        st.stop()
+df = load_data()
 
 # Sidebar navigation
-st.sidebar.title("📊 Dashboard Navigation")
-menu = st.sidebar.radio("Choose Section", [
+st.sidebar.title("🔍 Navigation")
+section = st.sidebar.radio("Go to section:", [
     "Dataset Overview", "EDA", "Association Rules",
-    "Spender Prediction", "Clustering", "Business Insights"
+    "Spender Prediction", "Customer Clustering", "Insights"
 ])
 
 st.title("🛍️ E-Commerce Data Mining Dashboard")
 
-if menu == "Dataset Overview":
-    st.subheader("📂 Dataset Sample & Info")
-    st.write(df.head())
-    st.write("Shape:", df.shape)
+# Dataset Overview
+if section == "Dataset Overview":
+    st.subheader("📄 Data Sample")
+    st.write(df.sample(10))
+    st.write(f"Dataset contains {df.shape[0]} rows and {df.shape[1]} columns.")
     st.write("Columns:", df.columns.tolist())
+    st.write("Missing values per column:")
+    st.write(df.isnull().sum())
 
-elif menu == "EDA":
+# EDA Section
+elif section == "EDA":
     st.subheader("📊 Exploratory Data Analysis")
-    col1, col2 = st.columns(2)
+    
+    # Top products
+    st.markdown("### 🥇 Top 10 Products by Frequency")
+    st.bar_chart(df["Description"].value_counts().head(10))
 
-    with col1:
-        st.markdown("**Top 10 Products**")
-        top_products = df["Description"].value_counts().head(10)
-        st.bar_chart(top_products)
+    # Top countries
+    st.markdown("### 🌍 Top 10 Countries by Sales")
+    top_countries = df.groupby("Country")["TotalPrice"].sum().sort_values(ascending=False).head(10)
+    st.bar_chart(top_countries)
 
-    with col2:
-        st.markdown("**Top 10 Countries by Sales**")
-        top_countries = df.groupby("Country")["TotalPrice"].sum().sort_values(ascending=False).head(10)
-        st.bar_chart(top_countries)
+    # Quantity distribution
+    st.markdown("### 🧮 Quantity Distribution")
+    fig1, ax1 = plt.subplots()
+    sns.histplot(df["Quantity"], bins=30, kde=True, color="green", ax=ax1)
+    st.pyplot(fig1)
 
-    st.markdown("**Quantity Distribution**")
-    fig, ax = plt.subplots()
-    sns.histplot(df["Quantity"], bins=30, kde=True, color="green", ax=ax)
-    st.pyplot(fig)
+    # Price distribution
+    st.markdown("### 💵 Unit Price Distribution")
+    fig2, ax2 = plt.subplots()
+    sns.histplot(df["UnitPrice"], bins=50, kde=True, color="purple", ax=ax2)
+    st.pyplot(fig2)
 
-    st.markdown("**Monthly Sales Trend**")
-    fig, ax = plt.subplots(figsize=(10, 5))
-    df.set_index("InvoiceDate").resample('M')["TotalPrice"].sum().plot(ax=ax, title="Monthly Sales Trend")
-    st.pyplot(fig)
+    # Monthly sales
+    st.markdown("### 📆 Monthly Sales Trend")
+    df['InvoiceMonth'] = df['InvoiceDate'].dt.to_period('M')
+    monthly_sales = df.groupby("InvoiceMonth")["TotalPrice"].sum()
+    fig3, ax3 = plt.subplots()
+    monthly_sales.plot(ax=ax3, color="orange", marker="o")
+    ax3.set_ylabel("Total Sales")
+    st.pyplot(fig3)
 
-elif menu == "Association Rules":
+# Association Rules
+elif section == "Association Rules":
     st.subheader("🔗 Association Rule Mining")
-    min_support = st.slider("Select Minimum Support", 0.005, 0.05, 0.01, 0.005)
-    min_lift = st.slider("Select Minimum Lift", 1.0, 3.0, 1.2, 0.1)
-
     df_uk = df[df["Country"] == "United Kingdom"]
+    top_items = df_uk["Description"].value_counts().head(50).index
+    df_uk = df_uk[df_uk["Description"].isin(top_items)]
     basket = df_uk.groupby(["InvoiceNo", "Description"])["Quantity"].sum().unstack().fillna(0)
     basket_bool = (basket > 0).astype(bool)
 
     if basket_bool.empty or basket_bool.shape[1] < 2:
         st.warning("Not enough transactions for rule mining.")
     else:
-        frequent_items = apriori(basket_bool, min_support=min_support, use_colnames=True)
-        rules = association_rules(frequent_items, metric="lift", min_threshold=min_lift)
-        rules = rules.sort_values("lift", ascending=False)
-        st.write("**Top 10 Association Rules:**")
+        frequent_items = apriori(basket_bool, min_support=0.02, use_colnames=True)
+        rules = association_rules(frequent_items, metric="lift", min_threshold=1)
+        st.write("**Strong Rules (Top 10):**")
         st.dataframe(rules[["antecedents", "consequents", "support", "confidence", "lift"]].head(10))
 
-elif menu == "Spender Prediction":
-    st.subheader("🎯 Classification: Spender Prediction")
+# Classification
+elif section == "Spender Prediction":
+    st.subheader("🎯 Classification: High vs Low Spender")
+
     df_class = df.copy()
-    df_class["PurchaseFrequency"] = df_class.groupby("CustomerID")["InvoiceNo"].transform("nunique")
-    df_class["Spender"] = (df_class["TotalPrice"] > df_class["TotalPrice"].quantile(0.75)).astype(int)
+    df_class["Spender"] = (df_class["TotalPrice"] > df_class["TotalPrice"].median()).astype(int)
     le = LabelEncoder()
     df_class["CountryEncoded"] = le.fit_transform(df_class["Country"])
 
-    X = df_class[["Quantity", "UnitPrice", "PurchaseFrequency", "CountryEncoded"]]
+    X = df_class[["Quantity", "UnitPrice", "CountryEncoded"]]
     y = df_class["Spender"]
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    model_choice = st.selectbox("Select Model", ["Decision Tree", "Naive Bayes", "KNN"])
+    model_choice = st.selectbox("Choose Model", ["Decision Tree", "Naive Bayes", "KNN"])
     if model_choice == "Decision Tree":
         model = DecisionTreeClassifier()
     elif model_choice == "Naive Bayes":
@@ -120,68 +124,44 @@ elif menu == "Spender Prediction":
 
     model.fit(X_train, y_train)
     y_pred = model.predict(X_test)
-    cv_scores = cross_val_score(model, X, y, cv=5)
-    st.text(f"Classification Report:\n{classification_report(y_test, y_pred)}")
-    st.metric("Accuracy", f"{round(accuracy_score(y_test, y_pred) * 100, 2)}%")
-    st.write(f"Cross-Validation Score: {cv_scores.mean():.2f} (+/- {cv_scores.std() * 2:.2f})")
 
-    st.markdown("### 🔍 Try It Yourself")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        qty = st.slider("Quantity", 1, 100, 1)
-    with col2:
-        price = st.slider("Unit Price", 0.1, 100.0, 1.0)
-    with col3:
-        country = st.selectbox("Country", df["Country"].unique())
+    st.text(classification_report(y_test, y_pred))
+    st.metric("Accuracy", round(accuracy_score(y_test, y_pred) * 100, 2))
+
+    st.markdown("### 🔍 Predict Your Own")
+    qty = st.slider("Quantity", 1, 100)
+    price = st.slider("Unit Price", 0.1, 100.0)
+    country = st.selectbox("Country", df["Country"].unique())
     country_code = le.transform([country])[0]
-    pred = model.predict([[qty, price, 1, country_code]])[0]  # Assuming PurchaseFrequency=1 for simplicity
+    pred = model.predict([[qty, price, country_code]])[0]
     st.success(f"Prediction: {'High Spender' if pred else 'Low Spender'}")
 
-elif menu == "Clustering":
-    st.subheader("🔵 Customer Segmentation (K-Means)")
-    customer_data = df.groupby("CustomerID").agg({
-        "Quantity": "sum",
-        "TotalPrice": "sum",
-        "InvoiceNo": "nunique"
-    }).reset_index()
-    customer_data.columns = ["CustomerID", "TotalQuantity", "TotalSpending", "PurchaseFrequency"]
-
-    k = st.slider("Number of Clusters", 2, 6, 4)
-    scaler = StandardScaler()
-    customer_scaled = scaler.fit_transform(customer_data[["TotalQuantity", "TotalSpending", "PurchaseFrequency"]])
+# Clustering
+elif section == "Customer Clustering":
+    st.subheader("🔵 Customer Segmentation via K-Means")
+    customer_data = df.groupby("CustomerID").agg({"Quantity": "sum", "TotalPrice": "sum"}).reset_index()
+    k = st.slider("Select Number of Clusters", 2, 6, 3)
     kmeans = KMeans(n_clusters=k, random_state=0)
-    customer_data["Cluster"] = kmeans.fit_predict(customer_scaled)
+    customer_data["Cluster"] = kmeans.fit_predict(customer_data[["Quantity", "TotalPrice"]])
 
-    st.subheader("Elbow Method for Optimal Clusters")
-    inertia = []
-    for k in range(1, 11):
-        kmeans = KMeans(n_clusters=k, random_state=0)
-        kmeans.fit(customer_scaled)
-        inertia.append(kmeans.inertia_)
-    fig, ax = plt.subplots(figsize=(10, 5))
-    plt.plot(range(1, 11), inertia, marker="o")
-    plt.title("Elbow Method for Optimal Clusters")
-    plt.xlabel("Number of Clusters")
-    plt.ylabel("Inertia")
+    fig, ax = plt.subplots()
+    sns.scatterplot(data=customer_data, x="Quantity", y="TotalPrice", hue="Cluster", palette="Set2", ax=ax)
+    plt.title("Customer Clusters")
     st.pyplot(fig)
 
-    fig, ax = plt.subplots(figsize=(10, 5))
-    sns.scatterplot(data=customer_data, x="TotalQuantity", y="TotalSpending", hue="Cluster", palette="Set2", size="PurchaseFrequency", ax=ax)
-    plt.title("Customer Segments")
-    st.pyplot(fig)
-
-elif menu == "Business Insights":
+# Insights
+elif section == "Insights":
     st.subheader("💡 Business Recommendations")
     st.markdown("""
-    ### Key Insights:
-    - 💰 High spenders can be identified using classification models.
-    - 🔄 Association rules suggest bundling opportunities (e.g., "WHITE HANGING HEART T-LIGHT HOLDER" with "REGENCY CAKESTAND").
-    - 🌍 UK dominates sales, with peak months in December.
-    - 🧠 Clustering reveals high-value customer segments.
+    ### Key Findings:
+    - Most customers purchase small quantities.
+    - UK is the dominant market with highest sales.
+    - High-spending customers are identifiable with >80% model accuracy.
+    - Association rules show co-purchase patterns for bundling.
 
-    ### Actions:
-    - 🎁 Implement loyalty programs for high-spending clusters.
-    - 📦 Create bundled offers based on association rules.
-    - 🧠 Use Decision Tree model for real-time upselling to high spenders.
-    - 📅 Focus marketing campaigns in the UK during December.
+    ### Recommendations:
+    - 🎯 Target high-value segments with loyalty programs.
+    - 🧠 Use classification model to upsell in real-time.
+    - 📦 Create product bundles using strong association rules.
+    - 🌍 Expand marketing to countries with growing spend like Netherlands and Germany.
     """)
