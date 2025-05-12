@@ -16,18 +16,13 @@ import streamlit as st
 st.title("Online Retail Data Mining Dashboard")
 st.write("This app performs data mining on the Online Retail dataset, including EDA, Association Rule Mining, Classification, Clustering, and Business Insights.")
 
-# Cache the data loading function
-@st.cache_data
-def load_data(file):
-    return pd.read_excel(file)
-
 # File upload option
 uploaded_file = st.file_uploader("Upload Online Retail.xlsx", type=["xlsx"])
 if uploaded_file is not None:
-    df = load_data(uploaded_file)
+    df = pd.read_excel(uploaded_file)
 else:
     try:
-        df = load_data("Online Retail.xlsx")
+        df = pd.read_excel("Online Retail.xlsx")
     except FileNotFoundError:
         st.error("File 'Online Retail.xlsx' not found. Please upload the dataset or place it in the directory.")
         st.stop()
@@ -170,7 +165,7 @@ sns.scatterplot(data=customer_data, x="TotalQuantity", y="TotalSpending", hue="C
 plt.title("Customer Segments")
 st.pyplot(fig)
 
-# Business Recommendations
+# Business Recommendations (based on earlier insights)
 st.header("Business Recommendations")
 st.write("""
 - **Bundling**: Bundle high-lift items like "WHITE HANGING HEART T-LIGHT HOLDER" with "REGENCY CAKESTAND" based on association rules.
