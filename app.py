@@ -160,5 +160,4 @@ elif menu == "Insights":
     ### Suggested Actions:
     - ✅ Launch a **customer loyalty program** for high-value clusters.
     - 📦 Create bundles using **frequent itemsets** from association rules.
-    - 📈 Monitor new customers through **spending prediction model**.
     """)
