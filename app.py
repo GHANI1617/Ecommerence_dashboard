@@ -104,7 +104,7 @@ df_class = df.copy()
 df_class["PurchaseFrequency"] = df_class.groupby("CustomerID")["InvoiceNo"].transform("nunique")
 df_class["Spender"] = (df_class["TotalPrice"] > df_class["TotalPrice"].quantile(0.75)).astype(int)
 le = LabelEncoder()
-int(df_class["CountryEncoded"] = le.fit_transform(df_class["Country"])
+df_class["CountryEncoded"] = le.fit_transform(df_class["Country"])  # Fixed line
 
 X = df_class[["Quantity", "UnitPrice", "PurchaseFrequency", "CountryEncoded"]]
 y = df_class["Spender"]
