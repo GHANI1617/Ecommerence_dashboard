@@ -31,8 +31,21 @@ df = df[df["Quantity"] > 0]  # Remove returns
 df = df[np.abs(df["Quantity"] - df["Quantity"].mean()) <= (3 * df["Quantity"].std())]  # Remove quantity outliers
 df = df[df["UnitPrice"] > 0]  # Remove invalid prices
 
-# Correctly convert Excel serial dates to datetime
-df["InvoiceDate"] = pd.to_datetime(df["InvoiceDate"], unit='d', origin='1899-12-30')
+# Inspect and handle InvoiceDate conversion
+st.subheader("Inspecting InvoiceDate Column")
+st.write("First few InvoiceDate values:", df["InvoiceDate"].head())
+st.write("InvoiceDate dtype:", df["InvoiceDate"].dtype)
+
+# Handle InvoiceDate conversion based on its format
+if df["InvoiceDate"].dtype == "float64" or df["InvoiceDate"].dtype == "int64":
+    # If numeric (Excel serial date), convert to datetime
+    df["InvoiceDate"] = pd.to_datetime(df["InvoiceDate"], unit='d', origin='1899-12-30')
+elif df["InvoiceDate"].dtype != "datetime64[ns]":
+    # If not datetime but a string, parse it directly
+    df["InvoiceDate"] = pd.to_datetime(df["InvoiceDate"])
+else:
+    # Already in datetime format, no conversion needed
+    st.write("InvoiceDate is already in datetime format, skipping conversion.")
 
 df["TotalPrice"] = df["Quantity"] * df["UnitPrice"]
 st.write("Cleaned dataset preview:", df.head())
@@ -91,7 +104,7 @@ df_class = df.copy()
 df_class["PurchaseFrequency"] = df_class.groupby("CustomerID")["InvoiceNo"].transform("nunique")
 df_class["Spender"] = (df_class["TotalPrice"] > df_class["TotalPrice"].quantile(0.75)).astype(int)
 le = LabelEncoder()
-df_class["CountryEncoded"] = le.fit_transform(df_class["Country"])
+int(df_class["CountryEncoded"] = le.fit_transform(df_class["Country"])
 
 X = df_class[["Quantity", "UnitPrice", "PurchaseFrequency", "CountryEncoded"]]
 y = df_class["Spender"]
