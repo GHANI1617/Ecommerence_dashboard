@@ -1,3 +1,5 @@
+%%writefile app.py
+import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -10,19 +12,29 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import classification_report, accuracy_score
 from sklearn.cluster import KMeans
 import numpy as np
-import streamlit as st
 
-# Set page title and layout
-st.title("Online Retail Data Mining Dashboard")
-st.write("This app performs data mining on the Online Retail dataset, including EDA, Association Rule Mining, Classification, Clustering, and Business Insights.")
+# Page configuration
+st.set_page_config(page_title="E-Commerce Data Mining Dashboard", layout="wide")
 
-# File upload option
+# Cache the data loading function
+@st.cache_data
+def load_data(file):
+    df = pd.read_excel(file)
+    df.dropna(subset=["CustomerID", "Description"], inplace=True)
+    df["CustomerID"] = df["CustomerID"].astype(int)
+    df["Description"] = df["Description"].str.strip()
+    df["Country"] = df["Country"].str.strip()
+    df["TotalPrice"] = df["Quantity"] * df["UnitPrice"]
+    df["InvoiceDate"] = pd.to_datetime(df["InvoiceDate"])  # Convert to datetime
+    return df
+
+# Load data
 uploaded_file = st.file_uploader("Upload Online Retail.xlsx", type=["xlsx"])
 if uploaded_file is not None:
-    df = pd.read_excel(uploaded_file)
+    df = load_data(uploaded_file)
 else:
     try:
-        df = pd.read_excel("Online Retail.xlsx")
+        df = load_data("Online Retail.xlsx")
     except FileNotFoundError:
         st.error("File 'Online Retail.xlsx' not found. Please upload the dataset or place it in the directory.")
         st.stop()
@@ -30,146 +42,147 @@ else:
         st.error(f"Error loading file: {str(e)}")
         st.stop()
 
-# Data Cleaning
-st.header("Data Cleaning")
-df.dropna(subset=["CustomerID", "Description"], inplace=True)
-df["CustomerID"] = df["CustomerID"].astype(int)
-df["Description"] = df["Description"].str.strip()
-df["Country"] = df["Country"].str.strip()
+# Sidebar navigation
+st.sidebar.title("📊 Dashboard Navigation")
+menu = st.sidebar.radio("Choose Section", [
+    "Dataset Overview", "EDA", "Association Rules",
+    "Spender Prediction", "Clustering", "Business Insights"
+])
 
-# Handle negative quantities and outliers
-df = df[df["Quantity"] > 0]  # Remove returns
-df = df[np.abs(df["Quantity"] - df["Quantity"].mean()) <= (3 * df["Quantity"].std())]  # Remove quantity outliers
-df = df[df["UnitPrice"] > 0]  # Remove invalid prices
-df["TotalPrice"] = df["Quantity"] * df["UnitPrice"]
+st.title("🛍️ E-Commerce Data Mining Dashboard")
 
-# Convert InvoiceDate to datetime
-df["InvoiceDate"] = pd.to_datetime(df["InvoiceDate"])  # Already in datetime format, no unit/origin needed
-st.write("Cleaned dataset preview:", df.head())
+if menu == "Dataset Overview":
+    st.subheader("📂 Dataset Sample & Info")
+    st.write(df.head())
+    st.write("Shape:", df.shape)
+    st.write("Columns:", df.columns.tolist())
 
-# Exploratory Data Analysis
-st.header("Exploratory Data Analysis (EDA)")
+elif menu == "EDA":
+    st.subheader("📊 Exploratory Data Analysis")
+    col1, col2 = st.columns(2)
 
-# Top Products
-st.subheader("Top 10 Products by Frequency")
-top_products = df["Description"].value_counts().head(10)
-fig, ax = plt.subplots(figsize=(10, 5))
-top_products.plot(kind="bar", ax=ax, title="Top 10 Products by Frequency")
-plt.xticks(rotation=45)
-st.pyplot(fig)
+    with col1:
+        st.markdown("**Top 10 Products**")
+        top_products = df["Description"].value_counts().head(10)
+        st.bar_chart(top_products)
 
-# Sales Over Time
-st.subheader("Monthly Sales Trend")
-fig, ax = plt.subplots(figsize=(10, 5))
-df.set_index("InvoiceDate").resample('M')["TotalPrice"].sum().plot(ax=ax, title="Monthly Sales Trend")
-st.pyplot(fig)
+    with col2:
+        st.markdown("**Top 10 Countries by Sales**")
+        top_countries = df.groupby("Country")["TotalPrice"].sum().sort_values(ascending=False).head(10)
+        st.bar_chart(top_countries)
 
-# Country-wise Sales
-st.subheader("Top 10 Countries by Total Sales")
-top_countries = df.groupby("Country")["TotalPrice"].sum().sort_values(ascending=False).head(10)
-fig, ax = plt.subplots(figsize=(10, 5))
-top_countries.plot(kind="bar", ax=ax, title="Top 10 Countries by Total Sales", color='orange')
-plt.xticks(rotation=45)
-st.pyplot(fig)
+    st.markdown("**Quantity Distribution**")
+    fig, ax = plt.subplots()
+    sns.histplot(df["Quantity"], bins=30, kde=True, color="green", ax=ax)
+    st.pyplot(fig)
 
-# Quantity Distribution
-st.subheader("Quantity Distribution")
-fig, ax = plt.subplots(figsize=(10, 5))
-sns.histplot(df["Quantity"], bins=30, kde=True, ax=ax)
-plt.title("Quantity Distribution")
-st.pyplot(fig)
+    st.markdown("**Monthly Sales Trend**")
+    fig, ax = plt.subplots(figsize=(10, 5))
+    df.set_index("InvoiceDate").resample('M')["TotalPrice"].sum().plot(ax=ax, title="Monthly Sales Trend")
+    st.pyplot(fig)
 
-# Association Rule Mining
-st.header("Association Rule Mining")
-min_support = st.slider("Select Minimum Support", 0.005, 0.05, 0.01, 0.005)
-min_lift = st.slider("Select Minimum Lift", 1.0, 3.0, 1.2, 0.1)
+elif menu == "Association Rules":
+    st.subheader("🔗 Association Rule Mining")
+    min_support = st.slider("Select Minimum Support", 0.005, 0.05, 0.01, 0.005)
+    min_lift = st.slider("Select Minimum Lift", 1.0, 3.0, 1.2, 0.1)
 
-df_uk = df[df["Country"] == "United Kingdom"]
-basket = df_uk.groupby(["InvoiceNo", "Description"])["Quantity"].sum().unstack().fillna(0)
-basket_bool = (basket > 0).astype(bool)
+    df_uk = df[df["Country"] == "United Kingdom"]
+    basket = df_uk.groupby(["InvoiceNo", "Description"])["Quantity"].sum().unstack().fillna(0)
+    basket_bool = (basket > 0).astype(bool)
 
-frequent_items = apriori(basket_bool, min_support=min_support, use_colnames=True)
-rules = association_rules(frequent_items, metric="lift", min_threshold=min_lift)
-rules = rules.sort_values("lift", ascending=False)
+    if basket_bool.empty or basket_bool.shape[1] < 2:
+        st.warning("Not enough transactions for rule mining.")
+    else:
+        frequent_items = apriori(basket_bool, min_support=min_support, use_colnames=True)
+        rules = association_rules(frequent_items, metric="lift", min_threshold=min_lift)
+        rules = rules.sort_values("lift", ascending=False)
+        st.write("**Top 10 Association Rules:**")
+        st.dataframe(rules[["antecedents", "consequents", "support", "confidence", "lift"]].head(10))
 
-st.write("Top 10 Association Rules:")
-st.write(rules[["antecedents", "consequents", "support", "confidence", "lift"]].head(10))
+elif menu == "Spender Prediction":
+    st.subheader("🎯 Classification: Spender Prediction")
+    df_class = df.copy()
+    df_class["PurchaseFrequency"] = df_class.groupby("CustomerID")["InvoiceNo"].transform("nunique")
+    df_class["Spender"] = (df_class["TotalPrice"] > df_class["TotalPrice"].quantile(0.75)).astype(int)
+    le = LabelEncoder()
+    df_class["CountryEncoded"] = le.fit_transform(df_class["Country"])
 
-# Classification
-st.header("Classification Models")
-df_class = df.copy()
-df_class["PurchaseFrequency"] = df_class.groupby("CustomerID")["InvoiceNo"].transform("nunique")
-df_class["Spender"] = (df_class["TotalPrice"] > df_class["TotalPrice"].quantile(0.75)).astype(int)
-le = LabelEncoder()
-df_class["CountryEncoded"] = le.fit_transform(df_class["Country"])
+    X = df_class[["Quantity", "UnitPrice", "PurchaseFrequency", "CountryEncoded"]]
+    y = df_class["Spender"]
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-X = df_class[["Quantity", "UnitPrice", "PurchaseFrequency", "CountryEncoded"]]
-y = df_class["Spender"]
+    model_choice = st.selectbox("Select Model", ["Decision Tree", "Naive Bayes", "KNN"])
+    if model_choice == "Decision Tree":
+        model = DecisionTreeClassifier()
+    elif model_choice == "Naive Bayes":
+        model = GaussianNB()
+    else:
+        model = KNeighborsClassifier()
 
-scaler = StandardScaler()
-X_scaled = scaler.fit_transform(X)
-X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
-
-models = {
-    "Decision Tree": DecisionTreeClassifier(),
-    "Naive Bayes": GaussianNB(),
-    "KNN": KNeighborsClassifier()
-}
-
-for name, model in models.items():
     model.fit(X_train, y_train)
     y_pred = model.predict(X_test)
-    cv_scores = cross_val_score(model, X_scaled, y, cv=5)
-    st.subheader(f"{name} Performance")
-    st.write(f"Accuracy: {accuracy_score(y_test, y_pred):.2f}")
+    cv_scores = cross_val_score(model, X, y, cv=5)
+    st.text(f"Classification Report:\n{classification_report(y_test, y_pred)}")
+    st.metric("Accuracy", f"{round(accuracy_score(y_test, y_pred) * 100, 2)}%")
     st.write(f"Cross-Validation Score: {cv_scores.mean():.2f} (+/- {cv_scores.std() * 2:.2f})")
-    st.text("Classification Report:")
-    st.text(classification_report(y_test, y_pred))
 
-# Clustering
-st.header("Customer Segmentation with Clustering")
-n_clusters = st.slider("Select Number of Clusters", 2, 10, 4)
+    st.markdown("### 🔍 Try It Yourself")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        qty = st.slider("Quantity", 1, 100, 1)
+    with col2:
+        price = st.slider("Unit Price", 0.1, 100.0, 1.0)
+    with col3:
+        country = st.selectbox("Country", df["Country"].unique())
+    country_code = le.transform([country])[0]
+    pred = model.predict([[qty, price, 1, country_code]])[0]  # Assuming PurchaseFrequency=1 for simplicity
+    st.success(f"Prediction: {'High Spender' if pred else 'Low Spender'}")
 
-customer_data = df.groupby("CustomerID").agg({
-    "Quantity": "sum",
-    "TotalPrice": "sum",
-    "InvoiceNo": "nunique"
-}).reset_index()
-customer_data.columns = ["CustomerID", "TotalQuantity", "TotalSpending", "PurchaseFrequency"]
+elif menu == "Clustering":
+    st.subheader("🔵 Customer Segmentation (K-Means)")
+    customer_data = df.groupby("CustomerID").agg({
+        "Quantity": "sum",
+        "TotalPrice": "sum",
+        "InvoiceNo": "nunique"
+    }).reset_index()
+    customer_data.columns = ["CustomerID", "TotalQuantity", "TotalSpending", "PurchaseFrequency"]
 
-scaler = StandardScaler()
-customer_scaled = scaler.fit_transform(customer_data[["TotalQuantity", "TotalSpending", "PurchaseFrequency"]])
-
-# Elbow Method
-st.subheader("Elbow Method for Optimal Clusters")
-inertia = []
-for k in range(1, 11):
+    k = st.slider("Number of Clusters", 2, 6, 4)
+    scaler = StandardScaler()
+    customer_scaled = scaler.fit_transform(customer_data[["TotalQuantity", "TotalSpending", "PurchaseFrequency"]])
     kmeans = KMeans(n_clusters=k, random_state=0)
-    kmeans.fit(customer_scaled)
-    inertia.append(kmeans.inertia_)
+    customer_data["Cluster"] = kmeans.fit_predict(customer_scaled)
 
-fig, ax = plt.subplots(figsize=(10, 5))
-plt.plot(range(1, 11), inertia, marker="o")
-plt.title("Elbow Method for Optimal Clusters")
-plt.xlabel("Number of Clusters")
-plt.ylabel("Inertia")
-st.pyplot(fig)
+    st.subheader("Elbow Method for Optimal Clusters")
+    inertia = []
+    for k in range(1, 11):
+        kmeans = KMeans(n_clusters=k, random_state=0)
+        kmeans.fit(customer_scaled)
+        inertia.append(kmeans.inertia_)
+    fig, ax = plt.subplots(figsize=(10, 5))
+    plt.plot(range(1, 11), inertia, marker="o")
+    plt.title("Elbow Method for Optimal Clusters")
+    plt.xlabel("Number of Clusters")
+    plt.ylabel("Inertia")
+    st.pyplot(fig)
 
-# KMeans Clustering
-kmeans = KMeans(n_clusters=n_clusters, random_state=0)
-customer_data["Cluster"] = kmeans.fit_predict(customer_scaled)
+    fig, ax = plt.subplots(figsize=(10, 5))
+    sns.scatterplot(data=customer_data, x="TotalQuantity", y="TotalSpending", hue="Cluster", palette="Set2", size="PurchaseFrequency", ax=ax)
+    plt.title("Customer Segments")
+    st.pyplot(fig)
 
-st.subheader("Customer Segments")
-fig, ax = plt.subplots(figsize=(10, 5))
-sns.scatterplot(data=customer_data, x="TotalQuantity", y="TotalSpending", hue="Cluster", palette="Set2", size="PurchaseFrequency", ax=ax)
-plt.title("Customer Segments")
-st.pyplot(fig)
+elif menu == "Business Insights":
+    st.subheader("💡 Business Recommendations")
+    st.markdown("""
+    ### Key Insights:
+    - 💰 High spenders can be identified using classification models.
+    - 🔄 Association rules suggest bundling opportunities (e.g., "WHITE HANGING HEART T-LIGHT HOLDER" with "REGENCY CAKESTAND").
+    - 🌍 UK dominates sales, with peak months in December.
+    - 🧠 Clustering reveals high-value customer segments.
 
-# Business Recommendations (based on earlier insights)
-st.header("Business Recommendations")
-st.write("""
-- **Bundling**: Bundle high-lift items like "WHITE HANGING HEART T-LIGHT HOLDER" with "REGENCY CAKESTAND" based on association rules.
-- **Targeted Marketing**: Target Cluster 0 (high TotalQuantity, moderate TotalSpending) with bulk purchase discounts.
-- **Regional Focus**: Focus marketing in the UK, especially during peak months (e.g., December) from sales trends.
-- **Predictive Upselling**: Use the Decision Tree model (highest accuracy) to predict and upsell to high spenders in real-time.
-""")
+    ### Actions:
+    - 🎁 Implement loyalty programs for high-spending clusters.
+    - 📦 Create bundled offers based on association rules.
+    - 🧠 Use Decision Tree model for real-time upselling to high spenders.
+    - 📅 Focus marketing campaigns in the UK during December.
+    """)
