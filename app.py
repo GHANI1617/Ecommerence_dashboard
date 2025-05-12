@@ -159,8 +159,8 @@ elif section == "Insights":
     - Association rules show co-purchase patterns for bundling.
 
     ### Recommendations:
-    - 🎯 Target high-value segments with loyalty programs.
-    - 🧠 Use classification model to upsell in real-time.
-    - 📦 Create product bundles using strong association rules.
-    - 🌍 Expand marketing to countries with growing spend like Netherlands and Germany.
+    -  Target high-value segments with loyalty programs.
+    -  Use classification model to upsell in real-time.
+    -  Create product bundles using strong association rules.
+    -  Expand marketing to countries with growing spend like Netherlands and Germany.
     """)
