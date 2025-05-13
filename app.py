@@ -47,8 +47,8 @@ if section == "Dataset Overview":
     st.write(df.sample(10))
     st.write(f"Dataset contains {df.shape[0]} rows and {df.shape[1]} columns.")
     st.write("Columns:", df.columns.tolist())
-    st.write("Missing values per column:")
-    st.write(df.isnull().sum())
+    st.write("Column Data Types:")
+    st.write(pd.DataFrame(df.dtypes, columns=["Data Type"]))
 
 # EDA Section
 elif section == "EDA":
