@@ -23,8 +23,6 @@ def load_data():
     df["Description"] = df["Description"].str.strip()
     df["Country"] = df["Country"].str.strip()
     df["TotalPrice"] = df["Quantity"] * df["UnitPrice"]
-
-    # Clean negative quantities and prices
     df = df[(df["Quantity"] > 0) & (df["UnitPrice"] > 0)]
     df.drop_duplicates(inplace=True)
     return df
@@ -53,74 +51,62 @@ if section == "Dataset Overview":
 # EDA Section
 elif section == "EDA":
     st.subheader("📊 Exploratory Data Analysis")
-    
-    # Top products
+
     st.markdown("### 🥇 Top 10 Products by Frequency")
     st.bar_chart(df["Description"].value_counts().head(10))
 
-    # Top countries
     st.markdown("### 🌍 Top 10 Countries by Sales")
     top_countries = df.groupby("Country")["TotalPrice"].sum().sort_values(ascending=False).head(10)
     st.bar_chart(top_countries)
 
-   # 📦 Quantity distribution (log scale)
-st.markdown("### 🧮 Quantity Distribution (Log Scale)")
-fig1, ax1 = plt.subplots()
-ax1.set_xscale("log")
-sns.histplot(df["Quantity"], bins=30, kde=True, color="green", ax=ax1)
-ax1.set_title("Quantity Distribution (Log Scale)")
-ax1.set_xlabel("Quantity")
-ax1.set_ylabel("Count")
-st.pyplot(fig1)
+    st.markdown("### 🧮 Quantity Distribution (Log Scale)")
+    fig1, ax1 = plt.subplots()
+    ax1.set_xscale("log")
+    sns.histplot(df["Quantity"], bins=30, kde=True, color="green", ax=ax1)
+    ax1.set_title("Quantity Distribution (Log Scale)")
+    ax1.set_xlabel("Quantity")
+    ax1.set_ylabel("Count")
+    st.pyplot(fig1)
 
-# 💵 Unit Price distribution (log scale)
-st.markdown("### 💵 Unit Price Distribution (Log Scale)")
-fig2, ax2 = plt.subplots()
-ax2.set_xscale("log")
-sns.histplot(df["UnitPrice"], bins=50, kde=True, color="purple", ax=ax2)
-ax2.set_title("Unit Price Distribution (Log Scale)")
-ax2.set_xlabel("Unit Price")
-ax2.set_ylabel("Count")
-st.pyplot(fig2)
+    st.markdown("### 💵 Unit Price Distribution (Log Scale)")
+    fig2, ax2 = plt.subplots()
+    ax2.set_xscale("log")
+    sns.histplot(df["UnitPrice"], bins=50, kde=True, color="purple", ax=ax2)
+    ax2.set_title("Unit Price Distribution (Log Scale)")
+    ax2.set_xlabel("Unit Price")
+    ax2.set_ylabel("Count")
+    st.pyplot(fig2)
 
- # Monthly sales
-st.markdown("### 📆 Monthly Sales Trend")
-df['InvoiceMonth'] = df['InvoiceDate'].dt.to_period('M')
-monthly_sales = df.groupby("InvoiceMonth")["TotalPrice"].sum()
-fig3, ax3 = plt.subplots()
-monthly_sales.plot(ax=ax3, color="orange", marker="o")
-ax3.set_ylabel("Total Sales")
-st.pyplot(fig3)
+    st.markdown("### 📆 Monthly Sales Trend")
+    df['InvoiceMonth'] = df['InvoiceDate'].dt.to_period('M')
+    monthly_sales = df.groupby("InvoiceMonth")["TotalPrice"].sum()
+    fig3, ax3 = plt.subplots()
+    monthly_sales.plot(ax=ax3, color="orange", marker="o")
+    ax3.set_ylabel("Total Sales")
+    st.pyplot(fig3)
 
 # Association Rules
 elif section == "Association Rules":
     st.subheader("🔗 Association Rule Mining")
 
-    # Filter UK transactions and top 50 frequent products
     df_uk = df[df["Country"] == "United Kingdom"]
     top_items = df_uk["Description"].value_counts().head(50).index
     df_uk = df_uk[df_uk["Description"].isin(top_items)]
 
-    # Create basket
     basket = df_uk.groupby(["InvoiceNo", "Description"])["Quantity"].sum().unstack().fillna(0)
-    basket_bool = (basket > 0)  # Boolean DataFrame
+    basket_bool = (basket > 0)
 
     if basket_bool.empty or basket_bool.shape[1] < 2:
         st.warning("Not enough transactions for rule mining.")
     else:
-        # Apply Apriori and association rules
         frequent_items = apriori(basket_bool, min_support=0.02, use_colnames=True)
         rules = association_rules(frequent_items, metric="lift", min_threshold=1)
-
-        # ✅ Clean frozensets for display
         rules['antecedents'] = rules['antecedents'].apply(lambda x: ', '.join(list(x)))
         rules['consequents'] = rules['consequents'].apply(lambda x: ', '.join(list(x)))
 
-        # Show top 10 rules
         st.markdown("### 📋 Top 10 Strong Association Rules")
         st.dataframe(rules[["antecedents", "consequents", "support", "confidence", "lift"]].head(10))
 
-        # Visualize top antecedents
         st.markdown("### 📈 Most Frequent Antecedents")
         top_antecedents = rules['antecedents'].value_counts().head(10)
 
@@ -129,9 +115,6 @@ elif section == "Association Rules":
         ax.set_title("Top 10 Antecedents in Association Rules")
         ax.set_xlabel("Frequency")
         st.pyplot(fig)
-
-
-
 
 # Classification
 elif section == "Spender Prediction":
