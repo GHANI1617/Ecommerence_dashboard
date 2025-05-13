@@ -104,14 +104,17 @@ elif section == "Association Rules":
         frequent_items = apriori(basket_bool, min_support=0.02, use_colnames=True)
         rules = association_rules(frequent_items, metric="lift", min_threshold=1)
 
-        # Show top rules
+        # ✅ Clean frozensets for display
+        rules['antecedents'] = rules['antecedents'].apply(lambda x: ', '.join(list(x)))
+        rules['consequents'] = rules['consequents'].apply(lambda x: ', '.join(list(x)))
+
+        # Show top 10 rules
         st.markdown("### 📋 Top 10 Strong Association Rules")
         st.dataframe(rules[["antecedents", "consequents", "support", "confidence", "lift"]].head(10))
 
         # Visualize top antecedents
         st.markdown("### 📈 Most Frequent Antecedents")
-        rules['antecedents_str'] = rules['antecedents'].apply(lambda x: ', '.join(list(x)))
-        top_antecedents = rules['antecedents_str'].value_counts().head(10)
+        top_antecedents = rules['antecedents'].value_counts().head(10)
 
         fig, ax = plt.subplots()
         top_antecedents.plot(kind='barh', color=sns.color_palette('Dark2'), ax=ax)
