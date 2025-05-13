@@ -83,14 +83,14 @@ ax2.set_xlabel("Unit Price")
 ax2.set_ylabel("Count")
 st.pyplot(fig2)
 
-    # Monthly sales
-    st.markdown("### 📆 Monthly Sales Trend")
-    df['InvoiceMonth'] = df['InvoiceDate'].dt.to_period('M')
-    monthly_sales = df.groupby("InvoiceMonth")["TotalPrice"].sum()
-    fig3, ax3 = plt.subplots()
-    monthly_sales.plot(ax=ax3, color="orange", marker="o")
-    ax3.set_ylabel("Total Sales")
-    st.pyplot(fig3)
+ # Monthly sales
+st.markdown("### 📆 Monthly Sales Trend")
+df['InvoiceMonth'] = df['InvoiceDate'].dt.to_period('M')
+monthly_sales = df.groupby("InvoiceMonth")["TotalPrice"].sum()
+fig3, ax3 = plt.subplots()
+monthly_sales.plot(ax=ax3, color="orange", marker="o")
+ax3.set_ylabel("Total Sales")
+st.pyplot(fig3)
 
 # Association Rules
 elif section == "Association Rules":
