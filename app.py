@@ -87,19 +87,38 @@ elif section == "EDA":
 # Association Rules
 elif section == "Association Rules":
     st.subheader("🔗 Association Rule Mining")
+
+    # Filter UK transactions and top 50 frequent products
     df_uk = df[df["Country"] == "United Kingdom"]
     top_items = df_uk["Description"].value_counts().head(50).index
     df_uk = df_uk[df_uk["Description"].isin(top_items)]
+
+    # Create basket
     basket = df_uk.groupby(["InvoiceNo", "Description"])["Quantity"].sum().unstack().fillna(0)
-    basket_bool = (basket > 0).astype(bool)
+    basket_bool = (basket > 0)  # Boolean DataFrame
 
     if basket_bool.empty or basket_bool.shape[1] < 2:
         st.warning("Not enough transactions for rule mining.")
     else:
+        # Apply Apriori and association rules
         frequent_items = apriori(basket_bool, min_support=0.02, use_colnames=True)
         rules = association_rules(frequent_items, metric="lift", min_threshold=1)
-        st.write("**Strong Rules (Top 10):**")
+
+        # Show top rules
+        st.markdown("### 📋 Top 10 Strong Association Rules")
         st.dataframe(rules[["antecedents", "consequents", "support", "confidence", "lift"]].head(10))
+
+        # Visualize top antecedents
+        st.markdown("### 📈 Most Frequent Antecedents")
+        rules['antecedents_str'] = rules['antecedents'].apply(lambda x: ', '.join(list(x)))
+        top_antecedents = rules['antecedents_str'].value_counts().head(10)
+
+        fig, ax = plt.subplots()
+        top_antecedents.plot(kind='barh', color=sns.color_palette('Dark2'), ax=ax)
+        ax.set_title("Top 10 Antecedents in Association Rules")
+        ax.set_xlabel("Frequency")
+        st.pyplot(fig)
+
 
 # Classification
 elif section == "Spender Prediction":
