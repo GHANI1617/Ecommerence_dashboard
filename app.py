@@ -38,7 +38,8 @@ section = st.sidebar.radio("Go to section:", [
     "Spender Prediction", "Customer Clustering", "Insights"
 ])
 
-st.title("🛍️ E-Commerce Data Mining Dashboard")
+st.title("🛍️ E-Commerce Dashboard")
+st.write("This app performs data mining on the Online Retail dataset, including EDA, Association Rule Mining, Classification, Clustering, and Business Insights.")
 
 # Dataset Overview
 if section == "Dataset Overview":
