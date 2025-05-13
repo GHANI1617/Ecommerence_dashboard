@@ -63,17 +63,25 @@ elif section == "EDA":
     top_countries = df.groupby("Country")["TotalPrice"].sum().sort_values(ascending=False).head(10)
     st.bar_chart(top_countries)
 
-    # Quantity distribution
-    st.markdown("### 🧮 Quantity Distribution")
-    fig1, ax1 = plt.subplots()
-    sns.histplot(df["Quantity"], bins=30, kde=True, color="green", ax=ax1)
-    st.pyplot(fig1)
+   # 📦 Quantity distribution (log scale)
+st.markdown("### 🧮 Quantity Distribution (Log Scale)")
+fig1, ax1 = plt.subplots()
+ax1.set_xscale("log")
+sns.histplot(df["Quantity"], bins=30, kde=True, color="green", ax=ax1)
+ax1.set_title("Quantity Distribution (Log Scale)")
+ax1.set_xlabel("Quantity")
+ax1.set_ylabel("Count")
+st.pyplot(fig1)
 
-    # Price distribution
-    st.markdown("### 💵 Unit Price Distribution")
-    fig2, ax2 = plt.subplots()
-    sns.histplot(df["UnitPrice"], bins=50, kde=True, color="purple", ax=ax2)
-    st.pyplot(fig2)
+# 💵 Unit Price distribution (log scale)
+st.markdown("### 💵 Unit Price Distribution (Log Scale)")
+fig2, ax2 = plt.subplots()
+ax2.set_xscale("log")
+sns.histplot(df["UnitPrice"], bins=50, kde=True, color="purple", ax=ax2)
+ax2.set_title("Unit Price Distribution (Log Scale)")
+ax2.set_xlabel("Unit Price")
+ax2.set_ylabel("Count")
+st.pyplot(fig2)
 
     # Monthly sales
     st.markdown("### 📆 Monthly Sales Trend")
